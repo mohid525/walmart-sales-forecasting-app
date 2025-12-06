@@ -16,7 +16,8 @@ if not os.path.exists("models/model.pkl"):
 
     st.warning("Training model for first time. This may take a moment...")
 
-    df = pd.read_csv("data/walmart.csv")
+    df = pd.read_csv("data/cleaned_engineered_data_small.csv")
+
 
     df = df.dropna()
 
