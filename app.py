@@ -255,14 +255,48 @@ def load_data():
 
 @st.cache_resource
 def load_models():
+    """
+    Load Random Forest and XGBoost models and input features.
+    XGBoost model will be downloaded from Google Drive if not present locally.
+    """
+    import gdown
+    import os
+    import joblib
+    import streamlit as st
+
+    # File paths
+    rf_model_path = "rf_model.pkl"
+    xgb_model_path = "xgb_model.pkl"
+    features_path = "input_features.pkl"
+
+    # Google Drive XGB link
+    gdrive_file_id = "1iUC1OCbVHiJqKlun4oWn5SWBpzk9W644"
+    xgb_url = f"https://drive.google.com/uc?id={gdrive_file_id}"
+
     try:
-        rf_model = joblib.load("rf_model.pkl")
-        xgb_model = joblib.load("xgb_model.pkl")  # XGBoost added
-        features = joblib.load("input_features.pkl")
+        # Download XGBoost model if missing
+        if not os.path.exists(xgb_model_path):
+            st.info("Downloading XGBoost model from Google Drive...")
+            gdown.download(xgb_url, xgb_model_path, quiet=False)
+
+        # Load models
+        rf_model = joblib.load(rf_model_path) if os.path.exists(rf_model_path) else None
+        xgb_model = joblib.load(xgb_model_path) if os.path.exists(xgb_model_path) else None
+        features = joblib.load(features_path) if os.path.exists(features_path) else None
+
+        if rf_model is None:
+            st.warning("Random Forest model not found.")
+        if xgb_model is None:
+            st.warning("XGBoost model not found.")
+        if features is None:
+            st.warning("Input features file not found.")
+
         return rf_model, xgb_model, features
-    except FileNotFoundError:
-        st.error("❌ Model files not found. Please run the modeling notebook first.")
+
+    except Exception as e:
+        st.error(f"Error loading models: {e}")
         return None, None, None
+
 
 @st.cache_data
 def load_store_stats():
