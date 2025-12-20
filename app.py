@@ -276,18 +276,19 @@ def load_store_stats():
 # ============================================================
 @st.cache_data
 def load_metrics():
-    rf_metrics = None
-    xgb_metrics = None
-    try:
+    import os
+    rf_metrics = xgb_metrics = None
+    st.write("Files in app folder:", os.listdir())  # debug
+    if os.path.exists("model_metrics.csv"):
         rf_metrics = pd.read_csv("model_metrics.csv")
-    except FileNotFoundError:
+    else:
         st.warning("Random Forest metrics not found")
-    
-    try:
+
+    if os.path.exists("model_metrics_xgb.csv"):
         xgb_metrics = pd.read_csv("model_metrics_xgb.csv")
-    except FileNotFoundError:
+    else:
         st.warning("XGBoost metrics not found")
-    
+
     return rf_metrics, xgb_metrics
 
 
