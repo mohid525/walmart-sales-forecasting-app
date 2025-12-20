@@ -271,12 +271,25 @@ def load_store_stats():
     except FileNotFoundError:
         return None
 
+# ============================================================
+# LOAD MODEL METRICS
+# ============================================================
 @st.cache_data
 def load_metrics():
+    rf_metrics = None
+    xgb_metrics = None
     try:
-        return pd.read_csv("model_metrics.csv")
+        rf_metrics = pd.read_csv("model_metrics.csv")
     except FileNotFoundError:
-        return None
+        st.warning("Random Forest metrics not found")
+    
+    try:
+        xgb_metrics = pd.read_csv("model_metrics_xgb.csv")
+    except FileNotFoundError:
+        st.warning("XGBoost metrics not found")
+    
+    return rf_metrics, xgb_metrics
+
 
 # ============================================================
 # IMPROVED PREDICTION FUNCTION
@@ -757,12 +770,8 @@ elif page == "🔮 Sales Prediction":
 elif page == "📊 Model Performance":
     st.title("📊 Model Performance Comparison")
 
-    rf_metrics = load_metrics()
+    rf_metrics, xgb_metrics = load_metrics()
 
-    try:
-        xgb_metrics = pd.read_csv("model_metrics_xgb.csv")
-    except:
-        xgb_metrics = None
 
     tab1, tab2 = st.tabs(["🌲 Random Forest", "⚡ XGBoost"])
 
