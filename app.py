@@ -821,6 +821,9 @@ elif page == "📊 Model Performance":
 
     with tab2:
         render_metrics(xgb_metrics, "XGBoost")
+        st.write("Files in repo:", os.listdir())
+st.write("Current working directory:", os.getcwd())
+
 
 
 
