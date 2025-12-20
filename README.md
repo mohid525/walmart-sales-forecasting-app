@@ -9,7 +9,7 @@ AI-powered Walmart sales prediction (by DEPARTMENT) with high accuracy using mac
 
 ## Live Demo
 
-**Try it now:** [walmart-sales-forecasting-app.streamlit.app](https://walmart-sales-forecasting-app-nmx4u44ddrmfjgruoyambb.streamlit.app/)
+**Try it now:** [walmart-sales-forecasting-app.streamlit.app](https://walmart-sales-forecasting-app-hq92lmyglfwfaltvscga2x.streamlit.app/)
 
 ## Key Features
 
