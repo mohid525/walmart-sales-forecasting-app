@@ -55,11 +55,11 @@ streamlit run app.py
 
 **Source:** [Kaggle - Extrovert vs Introvert Behavior Data](https://www.kaggle.com/datasets/micgonzalez/walmart-store-sales-forecasting/data)
 
-- **Samples:** 2,900+ validated records
-- **Features:** Behavioral and psychological metrics
-- **Target:** Personality type (Introvert/Extrovert)
-- **Distribution:** Balanced classes
-  
+- **Samples:** 10k records
+- **Features:** Store, Dept, Weekly Sales, CPI, Unemployment, etc.
+- **Target:** Weekly Sales
+- **Distribution:** Multiple stores & departments
+- 
 ## 💻 Application Pages
 
 1. **Into** - Overview
