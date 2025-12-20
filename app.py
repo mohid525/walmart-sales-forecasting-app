@@ -6,6 +6,10 @@ import plotly.express as px
 import plotly.graph_objects as go
 from datetime import datetime
 import warnings
+import os
+st.write("Current working directory:", os.getcwd())
+st.write("Files in app folder:", os.listdir())
+
 
 warnings.filterwarnings("ignore")
 
