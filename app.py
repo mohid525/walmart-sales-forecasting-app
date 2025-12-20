@@ -6,10 +6,6 @@ import plotly.express as px
 import plotly.graph_objects as go
 from datetime import datetime
 import warnings
-import os
-st.write("Current working directory:", os.getcwd())
-st.write("Files in app folder:", os.listdir())
-
 
 warnings.filterwarnings("ignore")
 
@@ -280,19 +276,18 @@ def load_store_stats():
 # ============================================================
 @st.cache_data
 def load_metrics():
-    import os
-    rf_metrics = xgb_metrics = None
-    st.write("Files in app folder:", os.listdir())  # debug
-    if os.path.exists("model_metrics.csv"):
+    rf_metrics = None
+    xgb_metrics = None
+    try:
         rf_metrics = pd.read_csv("model_metrics.csv")
-    else:
+    except FileNotFoundError:
         st.warning("Random Forest metrics not found")
-
-    if os.path.exists("model_metrics_xgb.csv"):
+    
+    try:
         xgb_metrics = pd.read_csv("model_metrics_xgb.csv")
-    else:
+    except FileNotFoundError:
         st.warning("XGBoost metrics not found")
-
+    
     return rf_metrics, xgb_metrics
 
 
@@ -771,7 +766,6 @@ elif page == "🔮 Sales Prediction":
             )
 
 
-
 elif page == "📊 Model Performance":
     st.title("📊 Model Performance Comparison")
 
@@ -826,10 +820,6 @@ elif page == "📊 Model Performance":
 
     with tab2:
         render_metrics(xgb_metrics, "XGBoost")
-        st.write("Files in repo:", os.listdir())
-st.write("Current working directory:", os.getcwd())
-
-
 
 
 elif page == "📘 Conclusion":
