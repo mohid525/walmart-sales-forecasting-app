@@ -256,12 +256,13 @@ def load_data():
 @st.cache_resource
 def load_models():
     try:
-        model = joblib.load("rf_model.pkl")
+        rf_model = joblib.load("rf_model.pkl")
+        xgb_model = joblib.load("xgb_model.pkl")  # XGBoost added
         features = joblib.load("input_features.pkl")
-        return model, features
+        return rf_model, xgb_model, features
     except FileNotFoundError:
         st.error("❌ Model files not found. Please run the modeling notebook first.")
-        return None, None
+        return None, None, None
 
 @st.cache_data
 def load_store_stats():
@@ -282,114 +283,62 @@ def load_metrics():
 # ============================================================
 def create_prediction_input(store, dept, temperature, fuel_price, cpi, unemployment, 
                            is_holiday, date, markdowns, feature_names, df, store_stats):
-    """Create properly formatted input for prediction with ALL required features"""
-    
-    # Initialize with zeros
     input_df = pd.DataFrame(0, index=[0], columns=feature_names)
     
     # Basic features
-    if "Store" in feature_names:
-        input_df.at[0, "Store"] = int(store)
-    if "Dept" in feature_names:
-        input_df.at[0, "Dept"] = int(dept)
-    if "Temperature" in feature_names:
-        input_df.at[0, "Temperature"] = float(temperature)
-    if "Fuel_Price" in feature_names:
-        input_df.at[0, "Fuel_Price"] = float(fuel_price)
-    if "CPI" in feature_names:
-        input_df.at[0, "CPI"] = float(cpi)
-    if "Unemployment" in feature_names:
-        input_df.at[0, "Unemployment"] = float(unemployment)
-    if "IsHoliday" in feature_names:
-        input_df.at[0, "IsHoliday"] = int(is_holiday)
+    if "Store" in feature_names: input_df.at[0, "Store"] = int(store)
+    if "Dept" in feature_names: input_df.at[0, "Dept"] = int(dept)
+    if "Temperature" in feature_names: input_df.at[0, "Temperature"] = float(temperature)
+    if "Fuel_Price" in feature_names: input_df.at[0, "Fuel_Price"] = float(fuel_price)
+    if "CPI" in feature_names: input_df.at[0, "CPI"] = float(cpi)
+    if "Unemployment" in feature_names: input_df.at[0, "Unemployment"] = float(unemployment)
+    if "IsHoliday" in feature_names: input_df.at[0, "IsHoliday"] = int(is_holiday)
     
-    # Date features - seasonal patterns
-    if "Month" in feature_names:
-        input_df.at[0, "Month"] = date.month
-    if "Day" in feature_names:
-        input_df.at[0, "Day"] = date.day
-    if "DayOfWeek" in feature_names:
-        input_df.at[0, "DayOfWeek"] = date.weekday()
-    if "Week" in feature_names:
-        input_df.at[0, "Week"] = date.isocalendar().week
+    # Date features
+    if "Month" in feature_names: input_df.at[0, "Month"] = date.month
+    if "Day" in feature_names: input_df.at[0, "Day"] = date.day
+    if "DayOfWeek" in feature_names: input_df.at[0, "DayOfWeek"] = date.weekday()
+    if "Week" in feature_names: input_df.at[0, "Week"] = date.isocalendar().week
+    if "Year" in feature_names: input_df.at[0, "Year"] = int(df['Year'].median()) if 'Year' in df.columns else 2011
     
-    # Year - use median from training
-    if "Year" in feature_names:
-        input_df.at[0, "Year"] = int(df['Year'].median()) if 'Year' in df.columns else 2011
-    
-    # Markdown features
+    # Markdowns
     for i, md_val in enumerate(markdowns, 1):
         md_col = f"MarkDown{i}"
-        if md_col in feature_names:
-            input_df.at[0, md_col] = float(md_val)
+        if md_col in feature_names: input_df.at[0, md_col] = float(md_val)
     
-    # Store-specific features
+    # Store/Dept features
     if 'Store' in df.columns:
         store_data = df[df['Store'] == store]
-        
         if len(store_data) > 0:
-            # Size and Type
-            if "Size" in feature_names and "Size" in df.columns:
-                input_df.at[0, "Size"] = store_data['Size'].iloc[0]
-            if "Type_B" in feature_names and "Type_B" in df.columns:
-                input_df.at[0, "Type_B"] = store_data['Type_B'].iloc[0]
-            if "Type_C" in feature_names and "Type_C" in df.columns:
-                input_df.at[0, "Type_C"] = store_data['Type_C'].iloc[0]
-            
-            # Department-specific features
+            if "Size" in feature_names and "Size" in df.columns: input_df.at[0, "Size"] = store_data['Size'].iloc[0]
+            if "Type_B" in feature_names and "Type_B" in df.columns: input_df.at[0, "Type_B"] = store_data['Type_B'].iloc[0]
+            if "Type_C" in feature_names and "Type_C" in df.columns: input_df.at[0, "Type_C"] = store_data['Type_C'].iloc[0]
+
             dept_data = store_data[store_data['Dept'] == dept] if 'Dept' in store_data.columns else store_data
-            
             if len(dept_data) > 0 and 'Weekly_Sales' in dept_data.columns:
                 dept_mean_sales = dept_data['Weekly_Sales'].mean()
-                
-                # Rolling features
                 for roll_col in ['Weekly_Sales_Rolling4', 'Weekly_Sales_Rolling8', 'Weekly_Sales_Rolling12']:
-                    if roll_col in feature_names:
-                        if roll_col in dept_data.columns:
-                            input_df.at[0, roll_col] = dept_data[roll_col].median()
-                        else:
-                            input_df.at[0, roll_col] = dept_mean_sales
-                
-                # Comparison features
+                    if roll_col in feature_names: input_df.at[0, roll_col] = dept_data[roll_col].median() if roll_col in dept_data.columns else dept_mean_sales
                 if "Sales_vs_StoreMean" in feature_names:
-                    if "Sales_vs_StoreMean" in dept_data.columns:
-                        input_df.at[0, "Sales_vs_StoreMean"] = dept_data['Sales_vs_StoreMean'].median()
-                    else:
-                        store_mean = store_data['Weekly_Sales'].mean()
-                        input_df.at[0, "Sales_vs_StoreMean"] = dept_mean_sales - store_mean
-                
-                # Lag features
-                for lag in [1, 2, 4]:
+                    input_df.at[0, "Sales_vs_StoreMean"] = dept_data['Sales_vs_StoreMean'].median() if "Sales_vs_StoreMean" in dept_data.columns else dept_mean_sales - store_data['Weekly_Sales'].mean()
+                for lag in [1,2,4]:
                     lag_col = f"Weekly_Sales_Lag{lag}"
-                    if lag_col in feature_names:
-                        if lag_col in dept_data.columns:
-                            input_df.at[0, lag_col] = dept_data[lag_col].median()
-                        else:
-                            input_df.at[0, lag_col] = dept_mean_sales
-        
-        # Use reference stats if no store data
+                    if lag_col in feature_names: input_df.at[0, lag_col] = dept_data[lag_col].median() if lag_col in dept_data.columns else dept_mean_sales
         elif store_stats is not None and store in store_stats['Store'].values:
             store_ref = store_stats[store_stats['Store'] == store].iloc[0]
-            if "Size" in feature_names and 'size' in store_ref:
-                input_df.at[0, "Size"] = store_ref['size']
-            if "Type_B" in feature_names and 'type_b' in store_ref:
-                input_df.at[0, "Type_B"] = store_ref['type_b']
-            if "Type_C" in feature_names and 'type_c' in store_ref:
-                input_df.at[0, "Type_C"] = store_ref['type_c']
+            if "Size" in feature_names and 'size' in store_ref: input_df.at[0, "Size"] = store_ref['size']
+            if "Type_B" in feature_names and 'type_b' in store_ref: input_df.at[0, "Type_B"] = store_ref['type_b']
+            if "Type_C" in feature_names and 'type_c' in store_ref: input_df.at[0, "Type_C"] = store_ref['type_c']
     
     # Fill remaining with dataset medians
     for col in input_df.columns:
         if pd.isna(input_df.at[0, col]) or input_df.at[0, col] == 0:
             if col in df.columns:
                 median_val = df[col].median()
-                if not pd.isna(median_val):
-                    input_df.at[0, col] = median_val
+                if not pd.isna(median_val): input_df.at[0, col] = median_val
     
-    # Final type conversion
     input_df = input_df.astype(float)
-    
     return input_df
-
 # ============================================================
 # PAGE 1: INTRODUCTION
 # ============================================================
@@ -724,211 +673,148 @@ elif page == "📈 EDA Dashboard":
 elif page == "🔮 Sales Prediction":
     st.title("🔮 Weekly Sales Prediction")
 
-    # Load data & models
     df = load_data()
-    model, feature_names = load_models()
-    store_stats = load_store_stats()   # REQUIRED
+    rf_model, xgb_model, feature_names = load_models()
+    store_stats = load_store_stats()
 
-    if df is None or model is None:
+    if df is None or rf_model is None or xgb_model is None:
         st.stop()
 
-    # Layout
     col1, col2 = st.columns(2)
-
-    # ---------------------------
-    # LEFT COLUMN
-    # ---------------------------
     with col1:
         store = st.selectbox("🏬 Store", sorted(df["Store"].unique()))
         dept = st.selectbox("📦 Department", sorted(df["Dept"].unique()))
-
-        date = st.date_input(
-            "📅 Date",
-            value=datetime(2015, 1, 1),
-            min_value=datetime(2010, 1, 1),
-            max_value=datetime(2026, 12, 31)
-        )
-
-        is_holiday = st.selectbox("🎉 Holiday", [0, 1])
-
-    # ---------------------------
-    # RIGHT COLUMN (FREE INPUT)
-    # ---------------------------
+        date = st.date_input("📅 Date", value=datetime(2015,1,1), min_value=datetime(2010,1,1), max_value=datetime(2026,12,31))
+        is_holiday = st.selectbox("🎉 Holiday", [0,1])
     with col2:
-        temperature = st.number_input(
-            "🌡️ Temperature",
-            min_value=1.0,
-            value=70.0,
-            step=1.0
-        )
+        temperature = st.number_input("🌡️ Temperature", min_value=1.0, value=70.0, step=1.0)
+        fuel_price = st.number_input("⛽ Fuel Price", min_value=1.0, value=3.5, step=0.1)
+        cpi = st.number_input("📈 CPI", min_value=1.0, value=220.0, step=1.0)
+        unemployment = st.number_input("📉 Unemployment", min_value=0.0, value=7.0, step=0.1)
 
-        fuel_price = st.number_input(
-            "⛽ Fuel Price",
-            min_value=1.0,
-            value=3.5,
-            step=0.1
-        )
-
-        cpi = st.number_input(
-            "📈 CPI",
-            min_value=1.0,
-            value=220.0,
-            step=1.0
-        )
-
-        unemployment = st.number_input(
-            "📉 Unemployment",
-            min_value=0.0,
-            value=7.0,
-            step=0.1
-        )
-
-    # ---------------------------
-    # MARKDOWNS
-    # ---------------------------
     st.markdown("### 💰 Promotional Markdowns")
-    markdowns = [
-        st.number_input(f"MarkDown{i+1}", min_value=0.0, value=0.0, step=100.0)
-        for i in range(5)
-    ]
+    markdowns = [st.number_input(f"MarkDown{i+1}", min_value=0.0, value=0.0, step=100.0) for i in range(5)]
 
-    # ---------------------------
-    # PREDICTION
-    # ---------------------------
+    model_option = st.radio("Select Model", ["Random Forest", "XGBoost"])  # MODEL SELECTION
+
     if st.button("🚀 Predict Weekly Sales"):
+        input_df = create_prediction_input(
+            store, dept, temperature, fuel_price, cpi, unemployment,
+            is_holiday, pd.to_datetime(date), markdowns, feature_names, df, store_stats
+        )
 
-            input_df = create_prediction_input(
-                store,
-                dept,
-                temperature,
-                fuel_price,
-                cpi,
-                unemployment,
-                is_holiday,
-                pd.to_datetime(date),
-                markdowns,
-                feature_names,
-                df,
-                store_stats
+        if model_option == "Random Forest":
+            prediction = rf_model.predict(input_df)[0]
+        else:
+            prediction = xgb_model.predict(input_df)[0]
+
+        st.markdown(
+            f"<div class='prediction-box'><h2>📊 Predicted Weekly Sales ({model_option})</h2><h1>${prediction:,.2f}</h1></div>",
+            unsafe_allow_html=True
+        )
+
+        # Historical context
+        store_avg = df[df["Store"] == store]["Weekly_Sales"].mean()
+        dept_avg = df[(df["Store"]==store)&(df["Dept"]==dept)]["Weekly_Sales"].mean()
+        overall_avg = df["Weekly_Sales"].mean()
+
+        st.markdown("""<div class="modern-card"><h3>🔍 Prediction Context</h3><p>The predicted value is generated for a <strong>specific department</strong> inside the selected store and should not be directly compared with store-wide or global averages.</p></div>""", unsafe_allow_html=True)
+
+        c1, c2, c3 = st.columns(3)
+        c1.metric("🏬 Store Avg", f"${store_avg:,.0f}")
+        c2.metric("📦 Dept Avg", f"${dept_avg:,.0f}")
+        c3.metric("🌍 Overall Avg", f"${overall_avg:,.0f}")
+        comparison_df = pd.DataFrame({
+            "Category": ["Prediction", "Dept Avg", "Store Avg", "Overall Avg"],
+            "Sales": [prediction, dept_avg, store_avg, overall_avg]
+        })
+
+        fig = px.bar(
+            comparison_df,
+            x="Category",
+            y="Sales",
+            title="📊 Prediction vs Historical Averages",
+            color="Category"
+        )
+        fig.update_layout(
+            paper_bgcolor="#1f2937",
+            plot_bgcolor="#1f2937",
+            font=dict(color="#e5e7eb"),
+            yaxis_title="Weekly Sales ($)"
+        )
+
+        st.plotly_chart(fig, use_container_width=True)
+        if dept_avg > 0:
+            percent_diff = ((prediction - dept_avg) / dept_avg) * 100
+            direction = "higher 📈" if percent_diff > 0 else "lower 📉"
+
+            st.info(
+                f"📦 **This prediction is {abs(percent_diff):.2f}% {direction} than the department's historical average sales.**"
             )
 
-            prediction = model.predict(input_df)[0]
 
-            # ---------------------------
-            # DISPLAY RESULT
-            # ---------------------------
-            st.markdown(
-                f"""
-                <div class='prediction-box'>
-                    <h2>📊 Predicted Weekly Sales</h2>
-                    <h1>${prediction:,.2f}</h1>
-                </div>
-                """,
-                unsafe_allow_html=True
-            )
 
-            # ---------------------------
-            # TRACEABILITY METRICS
-            # ---------------------------
-            store_avg = df[df["Store"] == store]["Weekly_Sales"].mean()
-            dept_avg = df[
-                (df["Store"] == store) & (df["Dept"] == dept)
-            ]["Weekly_Sales"].mean()
-            overall_avg = df["Weekly_Sales"].mean()
-
-            st.markdown("""
-<div class="modern-card">
-    <h3>🔍 Prediction Context</h3>
-    <p>
-        The predicted value is generated for a <strong>specific department</strong> inside
-        the selected store and should not be directly compared with store-wide or global averages.
-    </p>
-</div>
-""", unsafe_allow_html=True)
-
-            c1, c2, c3 = st.columns(3)
-            c1.metric("🏬 Store Avg", f"${store_avg:,.0f}")
-            c2.metric("📦 Dept Avg", f"${dept_avg:,.0f}")
-            c3.metric("🌍 Overall Avg", f"${overall_avg:,.0f}")
-
-            if dept_avg > 0:
-                diff = ((prediction - dept_avg) / dept_avg) * 100
-
-                st.info(
-                    f"📌 Prediction is **{diff:+.1f}%** compared to the department historical average. "
-                    "This variation is expected due to seasonality, promotions, holidays, and economic conditions."
-                )
-            
-            st.markdown("### 📈 Department Sales Distribution")
-
-            dept_data = df[
-                (df["Store"] == store) &
-                (df["Dept"] == dept)
-            ]
-
-            if len(dept_data) > 10:
-                fig = px.histogram(
-                    dept_data,
-                    x="Weekly_Sales",
-                    nbins=30,
-                    title=f"Store {store} - Department {dept} Historical Sales",
-                    opacity=0.75
-                )
-
-                fig.add_vline(
-                    x=prediction,
-                    line_dash="dash",
-                    line_color="red",
-                    annotation_text="Predicted Sales",
-                    annotation_position="top"
-                )
-
-                fig.add_vline(
-                    x=dept_avg,
-                    line_color="green",
-                    annotation_text="Dept Avg",
-                    annotation_position="top"
-                )
-
-                fig.update_layout(
-                    paper_bgcolor="#1f2937",
-                    plot_bgcolor="#1f2937",
-                    font=dict(color="#e5e7eb"),
-                    xaxis=dict(gridcolor="#374151"),
-                    yaxis=dict(gridcolor="#374151")
-                )
-
-                st.plotly_chart(fig, use_container_width=True)
-            else:
-                st.warning("Not enough historical data to plot distribution for this department.")
-
-# ============================================================
-# 📊 MODEL PERFORMANCE
-# ============================================================
 elif page == "📊 Model Performance":
-    st.title("📊 Model Performance")
+    st.title("📊 Model Performance Comparison")
 
-    metrics_df = load_metrics()
-    if metrics_df is None or metrics_df.empty:
-        st.warning("Metrics file not found")
-        st.stop()
+    rf_metrics = load_metrics()
 
-    metrics_df.columns = metrics_df.columns.str.lower().str.strip()
+    try:
+        xgb_metrics = pd.read_csv("model_metrics_xgb.csv")
+    except:
+        xgb_metrics = None
 
-    def get(col):
-        return metrics_df[col].iloc[0] if col in metrics_df.columns else np.nan
+    tab1, tab2 = st.tabs(["🌲 Random Forest", "⚡ XGBoost"])
 
-    r2 = get("r2")
-    mae = get("mae")
-    rmse = get("rmse")
+    def render_metrics(metrics_df, model_name):
+        if metrics_df is None:
+            st.warning(f"{model_name} metrics not found")
+            return
 
-    c1, c2, c3 = st.columns(3)
-    c1.metric("R²", f"{r2:.3f}")
-    c2.metric("MAE", f"${mae:,.0f}")
-    c3.metric("RMSE", f"${rmse:,.0f}")
+        st.subheader("📌 Test Set Metrics")
 
-    fig = px.bar(metrics_df.melt(), x="variable", y="value", title="Model Metrics")
-    st.plotly_chart(fig, use_container_width=True)
+        # Use TEST metrics only
+        metrics_df = metrics_df.set_index("Metric")
+
+        c1, c2, c3 = st.columns(3)
+
+        if "R2" in metrics_df.index:
+            c1.metric("R² Score", f"{metrics_df.loc['R2', 'Test']:.3f}")
+        if "MAE" in metrics_df.index:
+            c2.metric("MAE", f"${metrics_df.loc['MAE', 'Test']:,.0f}")
+        if "RMSE" in metrics_df.index:
+            c3.metric("RMSE", f"${metrics_df.loc['RMSE', 'Test']:,.0f}")
+
+        # Bar chart (Test metrics)
+        plot_df = metrics_df.loc[["MAE", "RMSE", "R2"]].reset_index()
+        plot_df["Value"] = plot_df["Test"]
+
+        fig = px.bar(
+            plot_df,
+            x="Metric",
+            y="Value",
+            title=f"{model_name} – Test Metrics",
+            color="Metric"
+        )
+
+        fig.update_layout(
+            paper_bgcolor="#1f2937",
+            plot_bgcolor="#1f2937",
+            font=dict(color="#e5e7eb"),
+            yaxis_title="Metric Value"
+        )
+
+        st.plotly_chart(fig, use_container_width=True)
+
+    # --------- Tabs ----------
+    with tab1:
+        render_metrics(rf_metrics, "Random Forest")
+
+    with tab2:
+        render_metrics(xgb_metrics, "XGBoost")
+
+
+
 elif page == "📘 Conclusion":
     st.title("📘 Project Conclusion")
 
