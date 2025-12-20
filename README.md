@@ -53,7 +53,7 @@ python walmart_model.py
 streamlit run app.py
 ## 📊 Dataset
 
-**Source:** [Kaggle - Extrovert vs Introvert Behavior Data](https://www.kaggle.com/datasets/micgonzalez/walmart-store-sales-forecasting/data)
+**Source:** [Kaggle - walmart-sales-data](https://www.kaggle.com/datasets/micgonzalez/walmart-store-sales-forecasting/data)
 
 - **Samples:** 10k records
 - **Features:** Store, Dept, Weekly Sales, CPI, Unemployment, etc.
